@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "photonics-nexus-ml-inference"
+version = "0.1.0"
+description = "Accurately run matchmaking between comapnies and professionals in the photonics industry"
+authors = ["goldenglorys <olusolagloryolamide@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "photonics_nexus_ml_inference"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+streamlit = "^1.35.0"
+groq = "^0.9.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
