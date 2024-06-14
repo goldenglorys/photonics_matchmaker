@@ -1,0 +1,31 @@
+Name: Sarah Johnson
+Contact Information:
+Email: sarah.johnson@ipgphotonics.com
+Phone: 555-555-5555
+LinkedIn: linkedin.com/in/sarahjohnson
+Summary:
+Highly experienced Photonics Engineer with over 10 years of experience in designing and developing cutting-edge photonics systems at IPG Photonics. Skilled in optical engineering software, device characterization, and optical system testing. Strong analytical and problem-solving skills with excellent communication and teamwork abilities.
+Education:
+Master of Science in Photonics Engineering, University of California, Los Angeles (2008-2010)
+Bachelor of Science in Physics, University of California, Berkeley (2004-2008)
+Work Experience:
+Senior Photonics Engineer, IPG Photonics (2015-Present)
+Designed and developed advanced photonics systems for various applications, including telecommunications, medical devices, and aerospace.
+Led a team of engineers in the development of a high-speed optical communication system, resulting in a 30% increase in data transmission rates.
+Collaborated with cross-functional teams to integrate photonics systems into larger products.
+Photonics Engineer, Coherent (2010-2015)
+Designed and tested optical components and systems for various applications, including laser systems and optical imaging.
+Developed and implemented new testing procedures for optical components, resulting in a 25% reduction in testing time.
+Worked closely with customers to understand their needs and develop customized solutions.
+Skills:
+Optical engineering software: ZEMAX, CODE V, and MATLAB
+Device characterization: Spectroscopy, interferometry, and microscopy
+Optical system testing: Optical bench testing, environmental testing, and reliability testing
+Programming languages: Python, C++, and Java
+Operating systems: Windows, Linux, and macOS
+Certifications:
+Certified Optical Engineer (COE), International Society for Optics and Photonics (2012)
+Certified Photonics Engineer (CPE), Photonics Society of America (2015)
+Personal Projects:
+Developed a high-speed optical communication system for wireless data transmission.
+Designed and built a laser-based imaging system for medical applications.

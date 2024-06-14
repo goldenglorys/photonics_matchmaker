@@ -1,17 +1,26 @@
-from typing import Generator
-
 import streamlit as st
+from components.sidebar import sidebar
 from groq import Groq
+from sentence_transformers import SentenceTransformer
 from streamlit_gsheets import GSheetsConnection
+from utils import (calculate_similarities, generate_chat_responses,
+                   generate_embeddings, load_resume, preprocess_company_data)
 
 st.set_page_config(
     page_icon="💬", layout="wide", page_title="Photonics Matchmaker Goes Brrrrrrrr..."
 )
 
+sidebar()
+
 # Create a connection object.
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 df = conn.read(spreadsheet=st.secrets["COMPANIES_DIRECTORY_URL"], ttl="30m")
+
+# Load the embedding model
+@st.cache_resource
+def load_model():
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
 
 def icon(emoji: str):
@@ -21,6 +30,8 @@ def icon(emoji: str):
         unsafe_allow_html=True,
     )
 
+
+model = load_model()
 
 icon("🏎️")
 
@@ -64,7 +75,7 @@ models = {
 # ------------------ Main App UI ------------------ #
 
 ml_tab, emb_vec_repr_tab, comp_dir_tab = st.tabs(
-    ["Use ML From Groq", "Use Embedding/Vector Repr", "Companies Data"]
+    ["Use Language Model", "Use Embedding Model + Vector", "Companies Data"]
 )
 
 with ml_tab:
@@ -112,17 +123,48 @@ Use varieties of open source models from Groq
             st.markdown(message["content"])
 
 with emb_vec_repr_tab:
-    pass
+    st.markdown(
+        """
+        This mechanism uses embedding models to convert company and candidate information into vectors, then use cosine similarity to find the best matches. This can be more efficient than using a large language model for every comparison.
+    """
+    )
+    st.markdown("""---""")
+    company_df = preprocess_company_data(df)
+    uploaded_file = st.file_uploader(
+        "Choose a resume file", type=["pdf", "docx", "txt"]
+    )
+    if uploaded_file is not None:
+        resume_text = load_resume(uploaded_file)
+        st.write(resume_text[:500] + "...")
+
+    if uploaded_file is not None and not company_df.empty:
+        company_embeddings = generate_embeddings(
+            model, company_df["combined_info"].tolist()
+        )
+        resume_embedding = generate_embeddings(model, [resume_text])[0]
+
+        similarities = calculate_similarities(resume_embedding, company_embeddings)
+        company_df["Similarity"] = similarities * 100
+        sorted_companies = company_df.sort_values("Similarity", ascending=False)
+
+        display_df = sorted_companies[
+            ["Company Name", "Similarity", "Location", "Specialization"]
+        ].copy()
+        display_df["Similarity"] = display_df["Similarity"].apply(lambda x: f"{x:.2f}%")
+        display_df = display_df.reset_index(drop=True)
+        display_df.index += 1
+
+        st.subheader("Matches:")
+        num_matches = st.slider(
+            "Number of matches to display",
+            min_value=1,
+            max_value=len(sorted_companies),
+            value=10,
+        )
+        st.table(display_df.head(num_matches))
 
 with comp_dir_tab:
     st.dataframe(df, height=1000, use_container_width=True)
-
-
-def generate_chat_responses(chat_completion) -> Generator[str, None, None]:
-    """Yield chat response content from the Groq API response."""
-    for chunk in chat_completion:
-        if chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
 
 
 if prompt := st.chat_input("Enter your prompt here..."):
