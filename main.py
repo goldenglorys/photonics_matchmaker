@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from components.sidebar import sidebar
 from groq import Groq
 from sentence_transformers import SentenceTransformer
@@ -7,8 +8,20 @@ from utils import (calculate_similarities, generate_chat_responses,
                    generate_embeddings, load_resume, preprocess_company_data)
 
 st.set_page_config(
-    page_icon="💬", layout="wide", page_title="Photonics Matchmaker Goes Brrrrrrrr..."
+    page_icon="🚀", layout="wide", page_title="Photonics Matchmaker Goes Brrrrrrrr..."
 )
+
+# Auto-scrolling script
+auto_scroll_script = """
+<script>
+    var chatContainer = window.parent.document.querySelector('[data-testid="stExpander"] .main');
+    if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+</script>
+"""
+
+components.html(auto_scroll_script, height=0)
 
 sidebar()
 
@@ -33,7 +46,7 @@ def icon(emoji: str):
 
 model = load_model()
 
-icon("🏎️")
+icon("🚀")
 
 st.subheader(
     "Photonics Matchmaker | Match professionals with companies in the photonics industry.",
@@ -74,11 +87,16 @@ models = {
 
 # ------------------ Main App UI ------------------ #
 
-ml_tab, emb_vec_repr_tab, comp_dir_tab = st.tabs(
-    ["Use Language Model", "Use Embedding Model + Vector", "Companies Data"]
+chatbot_tab, ml_tab, emb_vec_repr_tab, comp_dir_tab = st.tabs(
+    [
+        "General ChatBot",
+        "Use Language Model",
+        "Use Embedding Model + Vector",
+        "Companies Data",
+    ]
 )
 
-with ml_tab:
+with chatbot_tab:
     st.markdown(
         """
 Use varieties of open source models from Groq
@@ -88,6 +106,9 @@ Use varieties of open source models from Groq
 
     # Layout for model selection and max_tokens slider
     col1, col2 = st.columns(2)
+
+    # Create a container for chat history
+    chat_container = st.container()
 
     with col1:
         model_option = st.selectbox(
@@ -116,11 +137,55 @@ Use varieties of open source models from Groq
             help=f"Adjust the maximum number of tokens (words) for the model's response. Max for selected model: {max_tokens_range}",
         )
 
-    # Display chat messages from history on app rerun
-    for message in st.session_state.messages:
-        avatar = "🤖" if message["role"] == "assistant" else "👨‍💻"
-        with st.chat_message(message["role"], avatar=avatar):
-            st.markdown(message["content"])
+    prompt = st.chat_input("Enter your prompt here...")
+
+    with chat_container:
+        # Display chat messages from history on app rerun
+        for message in st.session_state.messages:
+            avatar = "🤖" if message["role"] == "assistant" else "👨‍💻"
+            with st.chat_message(message["role"], avatar=avatar):
+                st.markdown(message["content"])
+
+        if prompt :
+            st.session_state.messages.append({"role": "user", "content": prompt})
+
+            with st.chat_message("user", avatar="👨‍💻"):
+                st.markdown(prompt)
+
+            # Fetch response from Groq API
+            try:
+                chat_completion = client.chat.completions.create(
+                    model=model_option,
+                    messages=[
+                        {"role": m["role"], "content": m["content"]}
+                        for m in st.session_state.messages
+                    ],
+                    max_tokens=max_tokens,
+                    stream=True,
+                )
+
+                # Use the generator function with st.write_stream
+                with st.chat_message("assistant", avatar="🤖"):
+                    chat_responses_generator = generate_chat_responses(chat_completion)
+                    full_response = st.write_stream(chat_responses_generator)
+            except Exception as e:
+                st.error(e, icon="🚨")
+
+            # Append the full response to session_state.messages
+            if isinstance(full_response, str):
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": full_response}
+                )
+            else:
+                # Handle the case where full_response is not a string
+                combined_response = "\n".join(str(item) for item in full_response)
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": combined_response}
+                )
+
+
+with ml_tab:
+    pass
 
 with emb_vec_repr_tab:
     st.markdown(
@@ -167,39 +232,39 @@ with comp_dir_tab:
     st.dataframe(df, height=1000, use_container_width=True)
 
 
-if prompt := st.chat_input("Enter your prompt here..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# if prompt := st.chat_input("Enter your prompt here..."):
+#     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    with st.chat_message("user", avatar="👨‍💻"):
-        st.markdown(prompt)
+#     with st.chat_message("user", avatar="👨‍💻"):
+#         st.markdown(prompt)
 
-    # Fetch response from Groq API
-    try:
-        chat_completion = client.chat.completions.create(
-            model=model_option,
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            max_tokens=max_tokens,
-            stream=True,
-        )
+#     # Fetch response from Groq API
+#     try:
+#         chat_completion = client.chat.completions.create(
+#             model=model_option,
+#             messages=[
+#                 {"role": m["role"], "content": m["content"]}
+#                 for m in st.session_state.messages
+#             ],
+#             max_tokens=max_tokens,
+#             stream=True,
+#         )
 
-        # Use the generator function with st.write_stream
-        with st.chat_message("assistant", avatar="🤖"):
-            chat_responses_generator = generate_chat_responses(chat_completion)
-            full_response = st.write_stream(chat_responses_generator)
-    except Exception as e:
-        st.error(e, icon="🚨")
+#         # Use the generator function with st.write_stream
+#         with st.chat_message("assistant", avatar="🤖"):
+#             chat_responses_generator = generate_chat_responses(chat_completion)
+#             full_response = st.write_stream(chat_responses_generator)
+#     except Exception as e:
+#         st.error(e, icon="🚨")
 
-    # Append the full response to session_state.messages
-    if isinstance(full_response, str):
-        st.session_state.messages.append(
-            {"role": "assistant", "content": full_response}
-        )
-    else:
-        # Handle the case where full_response is not a string
-        combined_response = "\n".join(str(item) for item in full_response)
-        st.session_state.messages.append(
-            {"role": "assistant", "content": combined_response}
-        )
+#     # Append the full response to session_state.messages
+#     if isinstance(full_response, str):
+#         st.session_state.messages.append(
+#             {"role": "assistant", "content": full_response}
+#         )
+#     else:
+#         # Handle the case where full_response is not a string
+#         combined_response = "\n".join(str(item) for item in full_response)
+#         st.session_state.messages.append(
+#             {"role": "assistant", "content": combined_response}
+#         )
