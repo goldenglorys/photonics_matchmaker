@@ -6,7 +6,33 @@ def faq():
     st.markdown(
         """
 # FAQ
-## How does it work?
+## How does the embedding model mechanisms work?
+By analyzing the semantic similarity between job seekers' resumes and company profiles, the system provides data-driven recommendations to streamline the job matching process.
+
+Key Technical Points:
+
+- Data Ingestion:
+    Company data is sourced from Google Sheets, allowing for easy updates and maintenance.
+    Professional resumes are uploaded directly to the application in various formats (PDF, DOCX, TXT).
+
+- Text Preprocessing:
+    Company information is consolidated into a comprehensive text representation.
+    Resumes undergo text extraction to obtain their content regardless of the file format.
+
+- Semantic Embedding:
+    The system utilizes a pre-trained Sentence Transformer model (all-MiniLM-L6-v2) to convert text data into high-dimensional vector representations (embeddings).
+    These embeddings capture the semantic meaning of the text, enabling nuanced comparisons.
+
+- Similarity Computation:
+    Cosine similarity is calculated between the resume embedding and each company's embedding.
+    This mathematical measure quantifies the likeness of the professional's profile to each company's requirements and culture.
+
+- Results Presentation:
+    Companies are ranked based on their similarity scores, presented as percentages.
+    Users can adjust the number of matches displayed, allowing for comprehensive or focused views.
+
+
+## How does the language model mechanism work?
 When you upload a document, it will be divided into smaller chunks 
 and stored in a special type of database called a vector index 
 that allows for semantic search and retrieval.
