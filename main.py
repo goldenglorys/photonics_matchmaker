@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 from components.sidebar import sidebar
 from groq import Groq
 from sentence_transformers import SentenceTransformer
@@ -10,18 +9,6 @@ from utils import (calculate_similarities, generate_chat_responses,
 st.set_page_config(
     page_icon="🚀", layout="wide", page_title="Photonics Matchmaker Goes Brrrrrrrr..."
 )
-
-# Auto-scrolling script
-auto_scroll_script = """
-<script>
-    var chatContainer = window.parent.document.querySelector('[data-testid="stExpander"] .main');
-    if (chatContainer) {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
-</script>
-"""
-
-components.html(auto_scroll_script, height=0)
 
 sidebar()
 
@@ -87,20 +74,20 @@ models = {
 }
 
 
-chatbot_tab, ml_tab, emb_vec_repr_tab, provider_df_tab, consumer_df_tab  = st.tabs(
+chatbot_tab, ml_tab, emb_vec_repr_tab, provider_df_tab, consumer_df_tab = st.tabs(
     [
         "General ChatBot",
         "Use Language Model",
         "Use Embedding Model + Vector",
         "Providers Data",
-        "Consumers Data"
+        "Consumers Data",
     ]
 )
 
 with chatbot_tab:
     st.markdown(
         """
-Use varieties of open source models from Groq
+Use varieties of open source models
 """
     )
     st.markdown("""---""")
@@ -147,7 +134,7 @@ Use varieties of open source models from Groq
             with st.chat_message(message["role"], avatar=avatar):
                 st.markdown(message["content"])
 
-        if prompt :
+        if prompt:
             st.session_state.messages.append({"role": "user", "content": prompt})
 
             with st.chat_message("user", avatar="👨‍💻"):
@@ -195,8 +182,20 @@ with emb_vec_repr_tab:
     """
     )
     st.markdown("""---""")
+
     provider_df = preprocess_company_data(provider_df)
     consumer_df = preprocess_company_data(consumer_df)
+
+    data_source = st.selectbox(
+        "Choose a data source:",
+        options=["Providers Data", "Consumers Data"],
+    )
+
+    if data_source == "Provider Data":
+        data = provider_df
+    else:
+        data = consumer_df
+
     uploaded_file = st.file_uploader(
         "Choose a resume file", type=["pdf", "docx", "txt"]
     )
@@ -204,18 +203,21 @@ with emb_vec_repr_tab:
         resume_text = load_resume(uploaded_file)
         st.write(resume_text[:500] + "...")
 
-    if uploaded_file is not None and not provider_df.empty:
-        company_embeddings = generate_embeddings(
-            model, provider_df["combined_info"].tolist()
-        )
+    if uploaded_file is not None and not data.empty:
+        company_embeddings = generate_embeddings(model, data["combined_info"].tolist())
         resume_embedding = generate_embeddings(model, [resume_text])[0]
 
         similarities = calculate_similarities(resume_embedding, company_embeddings)
-        provider_df["Similarity"] = similarities * 100
-        sorted_companies = provider_df.sort_values("Similarity", ascending=False)
+        data["Match Score"] = similarities * 100
+        sorted_companies = data.sort_values("Match Score", ascending=False)
 
         display_df = sorted_companies[
-            ["Company Name", "Similarity", "Contact Information", "Basic Company Information"]
+            [
+                "Company Name",
+                "Similarity",
+                "Contact Information",
+                "Basic Company Information",
+            ]
         ].copy()
         display_df["Similarity"] = display_df["Similarity"].apply(lambda x: f"{x:.2f}%")
         display_df = display_df.reset_index(drop=True)
