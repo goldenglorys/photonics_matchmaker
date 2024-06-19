@@ -28,7 +28,8 @@ sidebar()
 # Create a connection object.
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-df = conn.read(spreadsheet=st.secrets["COMPANIES_DIRECTORY_URL"], ttl="30m")
+provider_df = conn.read(worksheet="TECH_PROVIDERS", ttl="30m")
+consumer_df = conn.read(worksheet="TECH_CONSUMERS", ttl="30m")
 
 # Load the embedding model
 @st.cache_resource
@@ -85,14 +86,14 @@ models = {
     "gemma-7b-it": {"name": "Gemma-7b-it", "tokens": 8192, "developer": "Google"},
 }
 
-# ------------------ Main App UI ------------------ #
 
-chatbot_tab, ml_tab, emb_vec_repr_tab, comp_dir_tab = st.tabs(
+chatbot_tab, ml_tab, emb_vec_repr_tab, provider_df_tab, consumer_df_tab  = st.tabs(
     [
         "General ChatBot",
         "Use Language Model",
         "Use Embedding Model + Vector",
-        "Companies Data",
+        "Providers Data",
+        "Consumers Data"
     ]
 )
 
@@ -194,7 +195,8 @@ with emb_vec_repr_tab:
     """
     )
     st.markdown("""---""")
-    company_df = preprocess_company_data(df)
+    provider_df = preprocess_company_data(provider_df)
+    consumer_df = preprocess_company_data(consumer_df)
     uploaded_file = st.file_uploader(
         "Choose a resume file", type=["pdf", "docx", "txt"]
     )
@@ -202,18 +204,18 @@ with emb_vec_repr_tab:
         resume_text = load_resume(uploaded_file)
         st.write(resume_text[:500] + "...")
 
-    if uploaded_file is not None and not company_df.empty:
+    if uploaded_file is not None and not provider_df.empty:
         company_embeddings = generate_embeddings(
-            model, company_df["combined_info"].tolist()
+            model, provider_df["combined_info"].tolist()
         )
         resume_embedding = generate_embeddings(model, [resume_text])[0]
 
         similarities = calculate_similarities(resume_embedding, company_embeddings)
-        company_df["Similarity"] = similarities * 100
-        sorted_companies = company_df.sort_values("Similarity", ascending=False)
+        provider_df["Similarity"] = similarities * 100
+        sorted_companies = provider_df.sort_values("Similarity", ascending=False)
 
         display_df = sorted_companies[
-            ["Company Name", "Similarity", "Location", "Specialization"]
+            ["Company Name", "Similarity", "Contact Information", "Basic Company Information"]
         ].copy()
         display_df["Similarity"] = display_df["Similarity"].apply(lambda x: f"{x:.2f}%")
         display_df = display_df.reset_index(drop=True)
@@ -228,43 +230,8 @@ with emb_vec_repr_tab:
         )
         st.table(display_df.head(num_matches))
 
-with comp_dir_tab:
-    st.dataframe(df, height=1000, use_container_width=True)
+with provider_df_tab:
+    st.dataframe(provider_df, height=1000, use_container_width=True)
 
-
-# if prompt := st.chat_input("Enter your prompt here..."):
-#     st.session_state.messages.append({"role": "user", "content": prompt})
-
-#     with st.chat_message("user", avatar="👨‍💻"):
-#         st.markdown(prompt)
-
-#     # Fetch response from Groq API
-#     try:
-#         chat_completion = client.chat.completions.create(
-#             model=model_option,
-#             messages=[
-#                 {"role": m["role"], "content": m["content"]}
-#                 for m in st.session_state.messages
-#             ],
-#             max_tokens=max_tokens,
-#             stream=True,
-#         )
-
-#         # Use the generator function with st.write_stream
-#         with st.chat_message("assistant", avatar="🤖"):
-#             chat_responses_generator = generate_chat_responses(chat_completion)
-#             full_response = st.write_stream(chat_responses_generator)
-#     except Exception as e:
-#         st.error(e, icon="🚨")
-
-#     # Append the full response to session_state.messages
-#     if isinstance(full_response, str):
-#         st.session_state.messages.append(
-#             {"role": "assistant", "content": full_response}
-#         )
-#     else:
-#         # Handle the case where full_response is not a string
-#         combined_response = "\n".join(str(item) for item in full_response)
-#         st.session_state.messages.append(
-#             {"role": "assistant", "content": combined_response}
-#         )
+with consumer_df_tab:
+    st.dataframe(consumer_df, height=1000, use_container_width=True)

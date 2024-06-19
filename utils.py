@@ -9,14 +9,15 @@ def preprocess_company_data(df):
     df["combined_info"] = df.apply(
         lambda row: f"""
     Company Name: {row['Company Name']}
-    Basic Info: {row['Basic Info']}
-    Location: {row['Location']}
-    Company Size: {row['Company Size']}
-    Specialization: {row['Specialization']}
-    Required Skills: {row['Required Skills']}
-    Company Culture: {row['Company Culture']}
-    Industry Served: {row['Industry Served']}
-    R&D Focus: {row['R&D Focus']}
+    Basic Company Information: {row['Basic Company Information']}
+    Contact Information: {row['Contact Information']}
+    Background: {row['Background']}
+    Product and Service Portfolio: {row['Product and Service Portfolio']}
+    Technology Focus and Expertise: {row['Technology Focus and Expertise']}
+    Matching Criteria: {row['Matching Criteria']}
+    Clientele and Partnerships: {row['Clientele and Partnerships']}
+    Market Presence and Competitive Positioning: {row['Market Presence and Competitive Positioning']}
+    Company Goals and Objectives: {row['Company Goals and Objectives']}
     """,
         axis=1,
     )
