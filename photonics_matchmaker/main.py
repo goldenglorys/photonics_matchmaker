@@ -7,20 +7,26 @@ providing matchmaking services and detailed analyses of potential matches.
 
 import logging
 
+import nltk
 import streamlit as st
 from groq import Groq
-from photonics_match_maker.components.sidebar import sidebar
-from photonics_match_maker.core.data_processing import load_and_process_data
-from photonics_match_maker.core.embedding import calculate_matches
-from photonics_match_maker.core.language_model import (analyze_matches,
-                                                       generate_chat_responses)
-from photonics_match_maker.utils.helpers import load_icon, process_resume
+
+from photonics_matchmaker.components.sidebar import sidebar
+from photonics_matchmaker.core.data_processing import load_and_process_data
+from photonics_matchmaker.core.embedding import calculate_matches
+from photonics_matchmaker.core.language_model import (analyze_matches,
+                                                      generate_chat_responses)
+from photonics_matchmaker.utils.helpers import load_icon, process_resume
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
 # Initialize Groq client
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+
+# Download the punkt resource if it's not already present
+if nltk.data.find("tokenizers/punkt") is None:
+    nltk.download("punkt")
 
 
 def main():

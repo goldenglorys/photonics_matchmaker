@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "photonics_match_maker"
+name = "photonics_matchmaker"
 version = "0.1.0"
 description = "Accurately run matchmaking between comapnies and professionals in the photonics industry"
 authors = ["goldenglorys <olusolagloryolamide@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "photonics_match_maker"}]
+packages = [{include = "photonics_matchmaker"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
