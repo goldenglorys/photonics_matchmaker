@@ -43,7 +43,7 @@ keyword_model = load_keyword_model()
 
 
 # Preprocess company data
-# @st.cache_data
+@st.cache_data
 def create_condensed_profile(row):
     tech_focus = summarize_text(summarizer, str(row["Technology Focus and Expertise"]))
     matching_criteria = extract_keywords(keyword_model, str(row["Matching Criteria"]))
@@ -231,9 +231,6 @@ with emb_vec_repr_tab:
     )
     st.markdown("""---""")
 
-    provider_df = preprocess_company_data_for_embedding(clean_df(provider_df))
-    consumer_df = preprocess_company_data_for_embedding(clean_df(consumer_df))
-
     data_source = st.selectbox(
         "Choose a data source:",
         options=["Providers", "Consumers"],
@@ -285,7 +282,7 @@ with emb_vec_repr_tab:
         st.table(display_df.head(num_matches))
 
 with provider_df_tab:
-    st.dataframe(provider_df, height=1000, use_container_width=True)
+    st.dataframe(keyword_provider_df, height=1000, use_container_width=True)
 
 with consumer_df_tab:
-    st.dataframe(consumer_df, height=1000, use_container_width=True)
+    st.dataframe(keyword_consumer_df, height=1000, use_container_width=True)
