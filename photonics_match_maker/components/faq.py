@@ -1,8 +1,18 @@
 # flake8: noqa
+"""
+FAQ component for the Photonics Matchmaker application.
+
+This module defines the FAQ content to be displayed in the app.
+"""
+
+
 import streamlit as st
 
 
 def faq():
+    """
+    Display the FAQ content in the Streamlit app.
+    """
     st.markdown(
         """
 # FAQ
