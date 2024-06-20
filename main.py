@@ -1,3 +1,16 @@
+"""
+Photonics Matchmaker: A Streamlit application for matching professionals with companies in the photonics industry.
+
+This application uses embedding models and language models to analyze resumes and company profiles,
+providing matchmaking services and detailed analyses of potential matches.
+
+Main components:
+- Data loading and preprocessing
+- Embedding-based matching
+- Language model-based detailed analysis
+- User interface for file upload and result display
+"""
+
 import nltk
 import streamlit as st
 from components.sidebar import sidebar
@@ -26,9 +39,15 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 provider_df = conn.read(worksheet="TECH_PROVIDERS", ttl="30m")
 consumer_df = conn.read(worksheet="TECH_CONSUMERS", ttl="30m")
 
-# Load the embedding model
+
 @st.cache_resource
 def load_embedding_model():
+    """
+    Load and cache the sentence transformer model for generating embeddings.
+
+    Returns:
+        SentenceTransformer: The loaded embedding model.
+    """
     return SentenceTransformer("all-MiniLM-L6-v2")
 
 
@@ -45,9 +64,17 @@ summarizer = load_summarizer()
 keyword_model = load_keyword_model()
 
 
-# Preprocess company data
 @st.cache_data
 def create_condensed_profile(row):
+    """
+    Create a condensed company profile from a dataframe row.
+
+    Args:
+        row (pd.Series): A row from the company dataframe.
+
+    Returns:
+        str: A condensed profile string containing key company information.
+    """
     tech_focus = summarize_text(summarizer, str(row["Technology Focus and Expertise"]))
     matching_criteria = extract_keywords(keyword_model, str(row["Matching Criteria"]))
     products_services = summarize_text(
@@ -69,6 +96,15 @@ def create_condensed_profile(row):
 
 @st.cache_data
 def preprocess_company_data(df):
+    """
+    Preprocess the company dataframe by creating condensed profiles for each company.
+
+    Args:
+        df (pd.DataFrame): The company dataframe.
+
+    Returns:
+        pd.DataFrame: The preprocessed dataframe with added 'company_profile' column.
+    """
     df["company_profile"] = df.apply(create_condensed_profile, axis=1)
     return df
 
@@ -99,6 +135,15 @@ client = Groq(
 
 
 def load_and_process_data(data_source):
+    """
+    Load and process company data based on the selected data source.
+
+    Args:
+        data_source (str): Either "Providers" or "Consumers".
+
+    Returns:
+        pd.DataFrame: The processed company dataframe.
+    """
     if data_source == "Providers":
         return keyword_provider_df
     else:
@@ -106,6 +151,15 @@ def load_and_process_data(data_source):
 
 
 def process_resume(uploaded_file):
+    """
+    Process an uploaded resume file and display a preview.
+
+    Args:
+        uploaded_file (UploadedFile): The uploaded resume file.
+
+    Returns:
+        str: The extracted text from the resume, or None if no file was uploaded.
+    """
     if uploaded_file is not None:
         resume_text = load_resume(uploaded_file)
         st.write(resume_text[:500] + "...")
@@ -114,6 +168,17 @@ def process_resume(uploaded_file):
 
 
 def calculate_matches(data, resume_text, embedding_model):
+    """
+    Calculate similarity scores between a resume and company profiles.
+
+    Args:
+        data (pd.DataFrame): The company dataframe.
+        resume_text (str): The text content of the resume.
+        embedding_model (SentenceTransformer): The embedding model.
+
+    Returns:
+        pd.DataFrame: The company dataframe sorted by match score in descending order.
+    """
     company_embeddings = generate_embeddings(
         embedding_model, data["company_profile"].tolist()
     )
@@ -124,6 +189,13 @@ def calculate_matches(data, resume_text, embedding_model):
 
 
 def display_matches(sorted_companies, num_matches):
+    """
+    Display a table of top matches.
+
+    Args:
+        sorted_companies (pd.DataFrame): The dataframe of companies sorted by match score.
+        num_matches (int): The number of top matches to display.
+    """
     display_df = sorted_companies[
         [
             "Company Name",
@@ -277,7 +349,9 @@ with ml_tab:
 
     with col1:
         data_source = st.selectbox(
-            "Choose a data source:", options=["Providers", "Consumers"], key="data_source"
+            "Choose a data source:",
+            options=["Providers", "Consumers"],
+            key="data_source",
         )
         data = load_and_process_data(data_source)
 
@@ -291,7 +365,9 @@ with ml_tab:
         )
 
     uploaded_file = st.file_uploader(
-        "Choose a resume file", type=["pdf", "docx", "txt"], key="language_model_uploader"
+        "Choose a resume file",
+        type=["pdf", "docx", "txt"],
+        key="language_model_uploader",
     )
     resume_text = process_resume(uploaded_file)
 
