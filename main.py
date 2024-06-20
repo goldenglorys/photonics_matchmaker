@@ -69,8 +69,6 @@ def preprocess_company_data(df):
     df["company_profile"] = df.apply(create_condensed_profile, axis=1)
     return df
 
-embed_provider_df = preprocess_company_data_for_embedding(provider_df)
-embed_consumer_df = preprocess_company_data_for_embedding(consumer_df)
 
 keyword_provider_df = preprocess_company_data(clean_df(provider_df))
 keyword_consumer_df = preprocess_company_data(clean_df(consumer_df))
@@ -233,15 +231,18 @@ with emb_vec_repr_tab:
     )
     st.markdown("""---""")
 
+    provider_df = preprocess_company_data_for_embedding(clean_df(provider_df))
+    consumer_df = preprocess_company_data_for_embedding(clean_df(consumer_df))
+
     data_source = st.selectbox(
         "Choose a data source:",
-        options=["Providers Data", "Consumers Data"],
+        options=["Providers", "Consumers"],
     )
 
-    if data_source == "Provider Data":
-        data = embed_provider_df
+    if data_source == "Providers":
+        data = keyword_provider_df
     else:
-        data = embed_consumer_df
+        data = keyword_consumer_df
 
     uploaded_file = st.file_uploader(
         "Choose a resume file", type=["pdf", "docx", "txt"]
@@ -251,7 +252,9 @@ with emb_vec_repr_tab:
         st.write(resume_text[:500] + "...")
 
     if uploaded_file is not None and not data.empty:
-        company_embeddings = generate_embeddings(embedding_model, data["combined_info"].tolist())
+        company_embeddings = generate_embeddings(
+            embedding_model, data["company_profile"].tolist()
+        )
         resume_embedding = generate_embeddings(embedding_model, [resume_text])[0]
 
         similarities = calculate_similarities(resume_embedding, company_embeddings)
@@ -266,7 +269,9 @@ with emb_vec_repr_tab:
                 "Basic Company Information",
             ]
         ].copy()
-        display_df["Match Score"] = display_df["Match Score"].apply(lambda x: f"{x:.2f}%")
+        display_df["Match Score"] = display_df["Match Score"].apply(
+            lambda x: f"{x:.2f}%"
+        )
         display_df = display_df.reset_index(drop=True)
         display_df.index += 1
 
@@ -280,7 +285,7 @@ with emb_vec_repr_tab:
         st.table(display_df.head(num_matches))
 
 with provider_df_tab:
-    st.dataframe(embed_provider_df, height=1000, use_container_width=True)
+    st.dataframe(provider_df, height=1000, use_container_width=True)
 
 with consumer_df_tab:
-    st.dataframe(embed_consumer_df, height=1000, use_container_width=True)
+    st.dataframe(consumer_df, height=1000, use_container_width=True)
