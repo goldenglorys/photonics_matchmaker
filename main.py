@@ -5,8 +5,11 @@ from core.keyword import extract_keywords, load_keyword_model
 from core.summarizer import load_summarizer, summarize_text
 from core.utils import (calculate_similarities, clean_df,
                         generate_chat_responses, generate_embeddings,
-                        load_resume, preprocess_company_data_for_embedding)
+                        load_resume)
 from groq import Groq
+from langchain.prompts import ChatPromptTemplate
+from langchain.schema.output_parser import StrOutputParser
+from langchain_groq import ChatGroq
 from sentence_transformers import SentenceTransformer
 from streamlit_gsheets import GSheetsConnection
 
@@ -93,6 +96,47 @@ st.subheader(
 client = Groq(
     api_key=st.secrets["GROQ_API_KEY"],
 )
+
+
+def load_and_process_data(data_source):
+    if data_source == "Providers":
+        return keyword_provider_df
+    else:
+        return keyword_consumer_df
+
+
+def process_resume(uploaded_file):
+    if uploaded_file is not None:
+        resume_text = load_resume(uploaded_file)
+        st.write(resume_text[:500] + "...")
+        return resume_text
+    return None
+
+
+def calculate_matches(data, resume_text, embedding_model):
+    company_embeddings = generate_embeddings(
+        embedding_model, data["company_profile"].tolist()
+    )
+    resume_embedding = generate_embeddings(embedding_model, [resume_text])[0]
+    similarities = calculate_similarities(resume_embedding, company_embeddings)
+    data["Match Score"] = similarities * 100
+    return data.sort_values("Match Score", ascending=False)
+
+
+def display_matches(sorted_companies, num_matches):
+    display_df = sorted_companies[
+        [
+            "Company Name",
+            "Match Score",
+            "Contact Information",
+            "Basic Company Information",
+        ]
+    ].copy()
+    display_df["Match Score"] = display_df["Match Score"].apply(lambda x: f"{x:.2f}%")
+    display_df = display_df.reset_index(drop=True)
+    display_df.index += 1
+    st.table(display_df.head(num_matches))
+
 
 # Initialize chat history and selected model
 if "messages" not in st.session_state:
@@ -221,7 +265,122 @@ Use varieties of open source models
 
 
 with ml_tab:
-    pass
+    st.markdown(
+        """
+    This tab uses a combination of embedding similarity and language model analysis for matchmaking.
+    """
+    )
+    st.markdown("""---""")
+
+    # Layout for data source, number of matches, and model selection
+    col1, col2 = st.columns(2)
+
+    with col1:
+        data_source = st.selectbox(
+            "Choose a data source:", options=["Providers", "Consumers"], key="data_source"
+        )
+        data = load_and_process_data(data_source)
+
+    with col2:
+        model_option = st.selectbox(
+            "Choose a model:",
+            options=list(models.keys()),
+            key="language_model_option",
+            format_func=lambda x: models[x]["name"],
+            index=0,  # Default to the first model in the list
+        )
+
+    uploaded_file = st.file_uploader(
+        "Choose a resume file", type=["pdf", "docx", "txt"], key="language_model_uploader"
+    )
+    resume_text = process_resume(uploaded_file)
+
+    if resume_text is not None and not data.empty:
+        sorted_companies = calculate_matches(data, resume_text, embedding_model)
+
+        col3, col4 = st.columns(2)
+
+        with col3:
+            num_matches = st.slider(
+                "Number of companies to analyze", min_value=1, max_value=10, value=5
+            )
+
+        with col4:
+            max_tokens = st.slider(
+                "Max Tokens:",
+                min_value=512,
+                max_value=models[model_option]["tokens"],
+                value=min(32768, models[model_option]["tokens"]),
+                step=512,
+                help=f"Adjust the maximum number of tokens for the model's response. Max for selected model: {models[model_option]['tokens']}",
+            )
+
+        top_matches = sorted_companies.head(num_matches)
+
+        llm = ChatGroq(groq_api_key=st.secrets["GROQ_API_KEY"], model_name=model_option)
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are an AI assistant specializing in matching job candidates with companies in the photonics industry. Provide concise, insightful analyses focusing on the strengths of the match.",
+                ),
+                (
+                    "human",
+                    """
+            Analyze the compatibility between the candidate and the following company in the photonics industry.
+            
+            Candidate Resume: {resume}
+            
+            Company Profile: {company_profile}
+            
+            Please provide the following:
+            1. Compatibility Score: Give a score from 0-100 based on how well the candidate's skills and experience match the company's needs.
+            2. Brief Explanation: In 2-3 sentences, explain why this company might be a good fit for the candidate.
+            3. Key Strengths: List 2-3 bullet points highlighting the candidate's most relevant skills or experiences for this company.
+            4. Potential Opportunities: Briefly mention 1-2 areas where the candidate could contribute to the company's goals or projects.
+
+            Format your response as follows:
+            Compatibility Score: [Score]/100
+            Match Explanation: [Your brief explanation]
+            Key Strengths:
+            • [Strength 1]
+            • [Strength 2]
+            • [Strength 3]
+            Potential Opportunities:
+            • [Opportunity 1]
+            • [Opportunity 2]
+            """,
+                ),
+            ]
+        )
+
+        chain = prompt | llm | StrOutputParser()
+
+        for _, company in top_matches.iterrows():
+            st.write(
+                f"### {company['Company Name']} (Match Score: {company['Match Score']:.2f}%)"
+            )
+
+            with st.spinner(
+                f"Generating detailed analysis for {company['Company Name']}..."
+            ):
+                try:
+                    analysis = chain.invoke(
+                        {
+                            "resume": resume_text[:1000],
+                            "company_profile": company["company_profile"],
+                        }
+                    )
+                    st.write(analysis)
+                except Exception as e:
+                    st.error(
+                        f"Error in generating analysis for {company['Company Name']}: {str(e)}"
+                    )
+
+            st.markdown("---")
+
+        st.success("Analysis complete!")
 
 with emb_vec_repr_tab:
     st.markdown(
@@ -230,47 +389,18 @@ with emb_vec_repr_tab:
     """
     )
     st.markdown("""---""")
-
     data_source = st.selectbox(
-        "Choose a data source:",
-        options=["Providers", "Consumers"],
+        "Choose a data source:", options=["Providers", "Consumers"]
     )
-
-    if data_source == "Providers":
-        data = keyword_provider_df
-    else:
-        data = keyword_consumer_df
+    data = load_and_process_data(data_source)
 
     uploaded_file = st.file_uploader(
-        "Choose a resume file", type=["pdf", "docx", "txt"]
+        "Choose a resume file", type=["pdf", "docx", "txt"], key="embed_model_uploader"
     )
-    if uploaded_file is not None:
-        resume_text = load_resume(uploaded_file)
-        st.write(resume_text[:500] + "...")
+    resume_text = process_resume(uploaded_file)
 
-    if uploaded_file is not None and not data.empty:
-        company_embeddings = generate_embeddings(
-            embedding_model, data["company_profile"].tolist()
-        )
-        resume_embedding = generate_embeddings(embedding_model, [resume_text])[0]
-
-        similarities = calculate_similarities(resume_embedding, company_embeddings)
-        data["Match Score"] = similarities * 100
-        sorted_companies = data.sort_values("Match Score", ascending=False)
-
-        display_df = sorted_companies[
-            [
-                "Company Name",
-                "Match Score",
-                "Contact Information",
-                "Basic Company Information",
-            ]
-        ].copy()
-        display_df["Match Score"] = display_df["Match Score"].apply(
-            lambda x: f"{x:.2f}%"
-        )
-        display_df = display_df.reset_index(drop=True)
-        display_df.index += 1
+    if resume_text is not None and not data.empty:
+        sorted_companies = calculate_matches(data, resume_text, embedding_model)
 
         st.subheader("Matches:")
         num_matches = st.slider(
@@ -279,7 +409,7 @@ with emb_vec_repr_tab:
             max_value=len(sorted_companies),
             value=10,
         )
-        st.table(display_df.head(num_matches))
+        display_matches(sorted_companies, num_matches)
 
 with provider_df_tab:
     st.dataframe(keyword_provider_df, height=1000, use_container_width=True)
