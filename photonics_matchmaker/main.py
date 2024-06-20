@@ -25,8 +25,8 @@ logging.basicConfig(level=logging.INFO)
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 # Download the punkt resource if it's not already present
-if nltk.data.find("tokenizers/punkt") is None:
-    nltk.download("punkt")
+# if nltk.data.find("tokenizers/punkt") is None:
+nltk.download("punkt")
 
 
 def main():
