@@ -5,7 +5,7 @@ import PyPDF2
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def preprocess_company_data(df):
+def preprocess_company_data_for_embedding(df):
     df["combined_info"] = df.apply(
         lambda row: f"""
     Company Name: {row['Company Name']}
@@ -21,6 +21,19 @@ def preprocess_company_data(df):
     """,
         axis=1,
     )
+    return df
+
+
+def clean_df(df):
+    df = df.fillna("")
+    text_columns = [
+        "Technology Focus and Expertise",
+        "Matching Criteria",
+        "Product and Service Portfolio",
+        "Company Goals and Objectives",
+    ]
+    for col in text_columns:
+        df[col] = df[col].astype(str)
     return df
 
 

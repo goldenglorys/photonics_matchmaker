@@ -1,10 +1,14 @@
+import nltk
 import streamlit as st
 from components.sidebar import sidebar
+from core.keyword import extract_keywords, load_keyword_model
+from core.summarizer import load_summarizer, summarize_text
+from core.utils import (calculate_similarities, clean_df,
+                        generate_chat_responses, generate_embeddings,
+                        load_resume, preprocess_company_data_for_embedding)
 from groq import Groq
 from sentence_transformers import SentenceTransformer
 from streamlit_gsheets import GSheetsConnection
-from utils import (calculate_similarities, generate_chat_responses,
-                   generate_embeddings, load_resume, preprocess_company_data)
 
 st.set_page_config(
     page_icon="🚀", layout="wide", page_title="Photonics Matchmaker Goes Brrrrrrrr..."
@@ -15,13 +19,61 @@ sidebar()
 # Create a connection object.
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# Load companies data based on category
 provider_df = conn.read(worksheet="TECH_PROVIDERS", ttl="30m")
 consumer_df = conn.read(worksheet="TECH_CONSUMERS", ttl="30m")
 
 # Load the embedding model
 @st.cache_resource
-def load_model():
+def load_embedding_model():
     return SentenceTransformer("all-MiniLM-L6-v2")
+
+
+# Download the punkt resource if it's not already present
+if nltk.data.find("tokenizers/punkt") is None:
+    nltk.download("punkt")
+
+embedding_model = load_embedding_model()
+
+
+summarizer = load_summarizer()
+
+
+keyword_model = load_keyword_model()
+
+
+# Preprocess company data
+# @st.cache_data
+def create_condensed_profile(row):
+    tech_focus = summarize_text(summarizer, str(row["Technology Focus and Expertise"]))
+    matching_criteria = extract_keywords(keyword_model, str(row["Matching Criteria"]))
+    products_services = summarize_text(
+        summarizer, str(row["Product and Service Portfolio"])
+    )
+    company_goals = extract_keywords(
+        keyword_model, str(row["Company Goals and Objectives"])
+    )
+
+    profile = f"""
+    Company: {row['Company Name']}
+    Focus: {tech_focus}
+    Key Criteria: {matching_criteria}
+    Products/Services: {products_services}
+    Goals: {company_goals}
+    """
+    return profile.strip()
+
+
+@st.cache_data
+def preprocess_company_data(df):
+    df["company_profile"] = df.apply(create_condensed_profile, axis=1)
+    return df
+
+embed_provider_df = preprocess_company_data_for_embedding(provider_df)
+embed_consumer_df = preprocess_company_data_for_embedding(consumer_df)
+
+keyword_provider_df = preprocess_company_data(clean_df(provider_df))
+keyword_consumer_df = preprocess_company_data(clean_df(consumer_df))
 
 
 def icon(emoji: str):
@@ -31,8 +83,6 @@ def icon(emoji: str):
         unsafe_allow_html=True,
     )
 
-
-model = load_model()
 
 icon("🚀")
 
@@ -183,18 +233,15 @@ with emb_vec_repr_tab:
     )
     st.markdown("""---""")
 
-    provider_df = preprocess_company_data(provider_df)
-    consumer_df = preprocess_company_data(consumer_df)
-
     data_source = st.selectbox(
         "Choose a data source:",
         options=["Providers Data", "Consumers Data"],
     )
 
     if data_source == "Provider Data":
-        data = provider_df
+        data = embed_provider_df
     else:
-        data = consumer_df
+        data = embed_consumer_df
 
     uploaded_file = st.file_uploader(
         "Choose a resume file", type=["pdf", "docx", "txt"]
@@ -204,8 +251,8 @@ with emb_vec_repr_tab:
         st.write(resume_text[:500] + "...")
 
     if uploaded_file is not None and not data.empty:
-        company_embeddings = generate_embeddings(model, data["combined_info"].tolist())
-        resume_embedding = generate_embeddings(model, [resume_text])[0]
+        company_embeddings = generate_embeddings(embedding_model, data["combined_info"].tolist())
+        resume_embedding = generate_embeddings(embedding_model, [resume_text])[0]
 
         similarities = calculate_similarities(resume_embedding, company_embeddings)
         data["Match Score"] = similarities * 100
@@ -214,12 +261,12 @@ with emb_vec_repr_tab:
         display_df = sorted_companies[
             [
                 "Company Name",
-                "Similarity",
+                "Match Score",
                 "Contact Information",
                 "Basic Company Information",
             ]
         ].copy()
-        display_df["Similarity"] = display_df["Similarity"].apply(lambda x: f"{x:.2f}%")
+        display_df["Match Score"] = display_df["Match Score"].apply(lambda x: f"{x:.2f}%")
         display_df = display_df.reset_index(drop=True)
         display_df.index += 1
 
@@ -233,7 +280,7 @@ with emb_vec_repr_tab:
         st.table(display_df.head(num_matches))
 
 with provider_df_tab:
-    st.dataframe(provider_df, height=1000, use_container_width=True)
+    st.dataframe(embed_provider_df, height=1000, use_container_width=True)
 
 with consumer_df_tab:
-    st.dataframe(consumer_df, height=1000, use_container_width=True)
+    st.dataframe(embed_consumer_df, height=1000, use_container_width=True)
