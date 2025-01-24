@@ -9,7 +9,7 @@ packages = [{include = "photonics_matchmaker"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-streamlit = "^1.35.0"
+streamlit = "^1.37.0"
 groq = "^0.9.0"
 st-gsheets-connection = "^0.0.4"
 scikit-learn = "^1.5.0"
